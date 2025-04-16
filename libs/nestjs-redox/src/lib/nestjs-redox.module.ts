@@ -7,6 +7,7 @@ import { getGlobalPrefix } from '@nestjs/swagger/dist/utils/get-global-prefix';
 import { normalizeRelPath } from '@nestjs/swagger/dist/utils/normalize-rel-path';
 import { validateGlobalPrefix } from '@nestjs/swagger/dist/utils/validate-global-prefix.util';
 import { validatePath } from '@nestjs/swagger/dist/utils/validate-path.util';
+import * as crypto from 'crypto';
 import { NextFunction, Response } from 'express';
 import expressAuth from 'express-basic-auth';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -63,7 +64,8 @@ const buildRedocHTML = (
   document: OpenAPIObject,
   documentURL: string | undefined,
   redoxOptions: NestJSRedoxOptions,
-  redocOptions: RedocOptions = {}
+  redocOptions: RedocOptions = {},
+  nonce: string
 ) => {
   const template = handlebars.compile(REDOC_HANDLEBAR);
   handlebars.registerHelper('json', (context) => {
@@ -84,6 +86,7 @@ const buildRedocHTML = (
     documentURL,
     redoxOptions,
     redocOptions,
+    nonce,
   });
 };
 
@@ -203,6 +206,7 @@ export class NestjsRedoxModule {
       redoxOptions: NestJSRedoxOptions;
     }
   ) {
+    const nonce = crypto.randomBytes(16).toString('base64');
     let document: OpenAPIObject;
     const documentURL = typeof documentOrURL === 'string' ? documentOrURL : undefined;
 
@@ -262,9 +266,9 @@ export class NestjsRedoxModule {
         }
 
         if (!html) {
-          html = buildRedocHTML(baseUrlForRedocUI, document, documentURL, options.redoxOptions, options.redocOptions);
+          html = buildRedocHTML(baseUrlForRedocUI, document, documentURL, options.redoxOptions, options.redocOptions, nonce);
         }
-        this.setContentSecurityHeader(httpAdapter, res);
+        this.setContentSecurityHeader(httpAdapter, res, nonce);
 
         if (options.redoxOptions.overwriteHeadersWith && typeof options.redoxOptions.overwriteHeadersWith === 'object') {
           this.overwriteHeadersWith(httpAdapter, res, options.redoxOptions.overwriteHeadersWith);
@@ -307,9 +311,9 @@ export class NestjsRedoxModule {
         }
 
         if (!html) {
-          html = buildRedocHTML(baseUrlForRedocUI, document, documentURL, options.redoxOptions, options.redocOptions);
+          html = buildRedocHTML(baseUrlForRedocUI, document, documentURL, options.redoxOptions, options.redocOptions, nonce);
         }
-        this.setContentSecurityHeader(httpAdapter, res);
+        this.setContentSecurityHeader(httpAdapter, res, nonce);
         res.send(html);
       });
     } catch (err) {
@@ -328,11 +332,10 @@ export class NestjsRedoxModule {
    * @param res
    * @private
    */
-  private static setContentSecurityHeader(httpAdapter: HttpServer, res: Response) {
+  private static setContentSecurityHeader(httpAdapter: HttpServer, res: Response, nonce: string) {
     const header = {
       name: 'Content-Security-Policy',
-      value:
-        "default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; child-src * 'unsafe-inline' 'unsafe-eval' blob:; worker-src * 'unsafe-inline' 'unsafe-eval' blob:; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';",
+      value: `object-src 'none'; script-src 'nonce-${nonce}'; frame-ancestors 'none'; base-uri 'none'; worker-src blob:; `,
     };
 
     if (httpAdapter.getType() === 'express') {

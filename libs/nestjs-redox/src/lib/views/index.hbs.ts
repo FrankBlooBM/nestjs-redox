@@ -23,13 +23,13 @@ export const REDOC_HANDLEBAR = `
   </head>
   <body>
     {{#unless redoxOptions.standalone}}
-    <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"> </script>
+    <script nonce="{{nonce}}" src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"> </script>
     {{else}}
-    <script src="{{baseUrlForRedocUI}}redoc.standalone.js"></script>
+    <script nonce="{{nonce}}" src="{{baseUrlForRedocUI}}redoc.standalone.js"></script>
     {{/unless}}
     <div id="redoc-container"></div>
 
-    <script>
+    <script nonce="{{nonce}}">
       function b64ToString(base64String) {
         const binString = atob(base64String);
         const decodedBytes = Uint8Array.from(binString, (m) => m.codePointAt(0));
